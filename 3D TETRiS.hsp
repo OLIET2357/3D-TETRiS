@@ -1,0 +1,656 @@
+#packopt name "3D TETRiS"
+#include "d3m.hsp"
+#include "KeyHook.hsp"
+;初めに このプログラムは出来るだけ綺麗に書くよう心掛けていますが
+;Tab や処理は統一していません。また、Tab に関してはこのプログラム、ループが非ん常ーに多いので
+;5段ぐらいになるので...
+
+#module
+
+#deffunc square int r, int px, int py, int pz , array sqcolor;関数squareを定義 square(一辺,x移動量,y移動量,z移動量,色配列) 立方体を描く
+
+	color 0,0,0
+	d3box px+r,py+r,pz+r,px-r,py-r,pz-r
+	
+	x = -r + px,  r + px,  r + px, -r + px
+	y = -r + py, -r + py,  r + py,  r + py
+	z = -r + pz, -r + pz, -r + pz, -r + pz
+	s =  r + pz,  r + pz,  r + pz,  r + pz
+	
+	color sqcolor(0), sqcolor(1), sqcolor(2)
+	d3square  x, y, z
+	d3square  x, y, s
+
+	x = -r + py,  r + py,  r + py, -r + py
+	y = -r + pz, -r + pz,  r + pz,  r + pz
+	z = -r + px, -r + px, -r + px, -r + px
+	s =  r + px,  r + px,  r + px,  r + px
+	
+	color sqcolor(3), sqcolor(4), sqcolor(5)
+	d3square  z, x, y
+	d3square  s, x, y
+	
+	x = -r + pz,  r + pz,  r + pz, -r + pz
+	y = -r + px, -r + px,  r + px,  r + px
+	z = -r + py, -r + py, -r + py, -r + py
+	s =  r + py,  r + py,  r + py,  r + py
+
+	color sqcolor(6), sqcolor(7), sqcolor(8)
+	d3square  y, z, x
+	d3square  y, s, x
+	
+	color 127,127,127
+	d3box px+r,py+r,pz+r,px-r,py-r,pz-r
+	
+	
+	return
+	
+#defcfunc hitjudge int tox , int toy , int toz , array Field;関数hitjudgeを定義 0(当たる) or 1(当たらない)==hitjudge(x,y,z,フィールドx,フィールドy) 当たり判定
+
+	if tox>=0 && tox<length(Field) && toy>=0 && toy<length2(Field) && toz>=0 && toz<length3(Field){ 
+	if Field(tox,toy,toz) <=8{;== 0 || ( field(tox,toy,toz) >=1 && field(tox,toy,toz) <=8 )  {
+	
+	
+return 1
+}}
+return 0
+
+#deffunc clear array Field;x関数 o命令clearを定義 clear(Field) 落ちてくる途中のブロックを消す
+	
+	repeat length3(Field);=Field_z
+	fz=cnt
+	repeat length2(Field);=Field_y
+	fy=cnt
+	repeat length(Field);=Field_x
+	fx=cnt
+	if Field(fx,fy,fz) >=1 && Field(fx,fy,fz) <=8 {
+	Field(fx,fy,fz)=0
+}
+	loop
+	loop
+	loop
+	
+	return
+
+#global
+
+*setting
+cls 4
+khHook *inkey
+;onkey gosub *inkey
+
+title "3D TETRiS"
+
+#define Field_x 10;読んで字の如く Fieldのxの量
+#define Field_y 10;読んで字のごt
+#define Field_z 20;読んd
+
+#define Tetromino_type 8;8種類
+#define Tetromino_blocks 4;4個
+
+#define grid 10
+#define size 500
+#define sg size/grid
+
+#define linehigh 2000
+
+dim Field , Field_x , Field_y , Field_z;Field 全体の状態が格納される3次元配列!(3次元配列なんて初めて使った!)
+dim Tetromino_x , Tetromino_blocks , Tetromino_type
+dim Tetromino_y , Tetromino_blocks , Tetromino_type
+dim Tetromino_z , Tetromino_blocks , Tetromino_type
+
+dim block_x , Tetromino_blocks
+dim block_y , Tetromino_blocks
+dim block_z , Tetromino_blocks
+
+dim block_x2, Tetromino_blocks
+dim block_y2, Tetromino_blocks
+dim block_z2, Tetromino_blocks
+
+
+time_start = d3timer()
+
+flag=0
+fall=Field_z-4
+
+gmode 5, , , 128;半透明
+;gmode 0;塗りつぶし
+
+/*
+Field(0,0,0)=10
+Field(9,8,0)=11
+Field(rnd(10),rnd(10),0)=12
+*/
+
+/*
+repeat length2(Field)
+i=cnt
+repeat length(Field)
+Field(cnt,i,0)=rnd(8)+9
+loop
+loop
+*/
+Field(5,5,0)=0
+
+;max=255 min=127, max=192 min=96,max=127 min=63
+sqcolor=127,255,255,96,192,192,63,127,127
+
+;-----ここから↓
+
+;sqcolors=127,255,255,96,192,192,63,127,127 , 255,255,127,192,192,96,127,127,63 , 127,255,127,96,192,96,63,127,63 , 255,127,127,192,96,96,127,63,63 , 127,127,255,96,96,192,63,63,127 , 255,196,127,192,144,96,127,85,63 , 255,127,255,192,96,192,127,63,127 , 192,127,192,144,96,144,85,63,85 ,127,127,127,127,127,127,127,127,127
+;水色,黄色,緑,赤,青,オレンジ,ピンク,紫
+ddim multiply , Tetromino_type *3
+multiply=0.5,1.0,1.0 , 1.0,1.0,0.5 , 0.5,1.0,0.5 , 1.0,0.5,0.5 , 0.5,0.5,1.0 , 0.5,0.25,0.0  , 1.0,0.0,1.0 , 0.5,0.0,0.5
+multiply=0.0,1.0,1.0 , 1.0,1.0,0.0 , 0.0,0.5,0.0 , 1.0,0.0,0.0 , 0.0,0.0,1.0 , 1.0,0.25,0.0  , 1.0,0.0,1.0 , 0.5,0.0,0.5
+basecolor=255,192,127
+
+
+repeat 8
+i=cnt
+repeat 3
+j=cnt
+repeat 3
+sqcolors(i*9+j*3+cnt)=multiply(cnt+i*3)*basecolor(j)
+loop
+loop
+loop
+
+;-----ここまで↑の処理は気にするな！(ｷﾘｯ
+
+randomize
+type=rnd(8)
+;pxx=Field_x/2
+;pyy=Field_y/2
+
+repeat 9
+sqcolor(cnt)=sqcolors(type+cnt)
+loop
+
+
+;Tetromino_I
+Tetromino_x(0,0)= 0,-1,1,2
+Tetromino_y(0,0)= 0, 0,0,0
+Tetromino_z(0,0)= 0, 0,0,0
+
+;Tetromino_T
+Tetromino_x(0,1)= -1,0,1,0
+Tetromino_y(0,1)=  0,0,0,1
+Tetromino_z(0,1)=  0,0,0,0
+
+;Tetromino_O
+Tetromino_x(0,2)= 0,0,-1,-1
+Tetromino_y(0,2)= 0,-1,0,-1
+Tetromino_z(0,2)= 0,0,0,0
+
+;Tetromino_L
+Tetromino_x(0,3)= 0,0,0,1
+Tetromino_y(0,3)= 2,1,0,0
+Tetromino_z(0,3)= 0,0,0,0
+
+;Tetromino_S
+Tetromino_x(0,4)= 0,1,1,2
+Tetromino_y(0,4)= 0,0,-1,-1
+Tetromino_z(0,4)= 0,0,0,0
+
+;Tetromino_LLD
+Tetromino_x(0,5)= 0,1,0,0
+Tetromino_y(0,5)= 0,0,-1,0
+Tetromino_z(0,5)= 0,0,0,1
+
+;Tetromino_LRD
+Tetromino_x(0,6)= 0,0,1,1
+Tetromino_y(0,6)= 0,0,0,1
+Tetromino_z(0,6)= 1,0,0,0
+
+;Tetromino_LLU
+Tetromino_x(0,7)= 0,0,0,1
+Tetromino_y(0,7)=-1,0,0,0
+Tetromino_z(0,7)= 1,1,0,0
+
+screen 2
+gsel 0,1
+*main
+	
+	time = d3timer() - time_start
+	redraw 0
+	color:boxf
+	
+		getkey key, 1 : camz += key * 100
+		getkey key, 2 : camz -= key * 100
+		; ホイール
+		camz += mousew * 2
+
+		camx = (mousex - ginfo_winx / 2) * 20
+		camy = (mousey - ginfo_winy / 2) * 20
+
+
+		; カメラ位置設定
+
+		d3setcam  camx, camy, camz, 0,0,0
+	
+		;d3setcam cos(0.0008 * time) * 2000, sin(0.0008 * time) * 2000, abs(cos(0.001 * time) * 1000)+sg*10,0,0,0
+	
+		;d3setcam camx,camy,camz,sg*((Tetromino_x(cnt,type) +pxx)*2+1 ) , sg*((Tetromino_y(cnt,type) +pyy)*2+1  ) , sg*(Tetromino_z(cnt,type)*2+1)  +sg*2*(20-(time/1000))
+	
+		;d3setcam 50,0,3000,50,50,50
+		
+		getkey key,27:if key:goto *setting;Escで初期化
+	
+	
+	
+	; 座標平面描画＋影----------------------------------------------------------------|
+		color 64, 192, 64                                                            ;|
+	                                                                                 ;|
+		repeat Field_x+1                                                             ;|
+			d3line sg*(cnt*2),0,0,sg*(cnt*2),sg*(Field_y*2),0                        ;|
+		loop                                                                         ;|
+	                                                                                 ;|
+		repeat Field_y+1                                                             ;|
+			d3line 0,sg*(cnt*2),0,sg*(Field_x*2),sg*(cnt*2),0                        ;|
+		loop	                                                                     ;|
+		                                                                             ;|
+		;影	                                                                         ;|
+	    r=sg                                                                         ;|
+		repeat Tetromino_blocks                                                      ;|
+			px=(block_x(cnt)*2+1)*sg                                                 ;|
+			py=(block_y(cnt)*2+1)*sg                                                 ;|
+			pz=sg                                                                    ;|
+			x = -r + px,  r + px,  r + px, -r + px                                   ;|
+			y = -r + py, -r + py,  r + py,  r + py                                   ;|
+			z = -r + pz, -r + pz, -r + pz, -r + pz                                   ;|
+			d3square x,y,z                                                           ;|
+		loop                                                                         ;|
+	                                                                                 ;|
+	                                                                                 ;|
+		color 255,0,0                                                                ;|
+			                                                                         ;|
+		d3line 0,0,0,0,0,linehigh                                                    ;|
+		color 0,0,255                                                                ;|
+		d3line 2*Field_x*sg ,0,0, 2*Field_x*sg ,0, linehigh                          ;|
+		d3line 0, 2*Field_y*sg ,0,0, 2*Field_y*sg ,linehigh                          ;|
+		d3line 2*Field_x*sg , 2*Field_y*sg ,0, 2*Field_x*sg , 2*Field_y*sg , linehigh;|
+		color 255,255,255                                                            ;|
+	                                                                                 ;|
+		d3mes "右",(Field_x*2+1)*sg/2 , -300 ,0                                      ;|
+		d3arrow (Field_x*2+1)*sg , -200 ,0 ,0,-200,0                                 ;|
+	                                                                                 ;|
+		d3mes "上", -300 , (Field_y*2+1)*sg/2 ,0                                     ;|
+		d3arrow -200 , (Field_y*2+1)*sg , 0 , -200 ,0 ,0                             ;|
+		;-----------------------------------------------------------------------------|
+	
+	
+	;sqcolor=255,255,255,255,255,255,255,255,255
+	;sqcolor=0,0,0,0,0,0,0,0,0
+	
+	gsel 2,0;ここら辺は試験用のデバッグウィンドウですね。はい。
+	color:boxf:color 255,255,255
+	repeat Field_y
+	i=cnt
+	repeat Field_x
+		pos cnt*20,i*20
+		mes Field(cnt,i,0)
+	loop
+	loop
+	pos 0,200
+	repeat Tetromino_blocks
+		mes "x: "+block_x(cnt)+" y:"+block_y(cnt)
+	loop
+	pos 0,300
+	repeat Tetromino_blocks
+		mes "x: "+block_x2(cnt)+" y:"+block_y2(cnt)
+	loop
+	pos 0,400
+	mes "pxx: "+Field_x/2
+	mes "pyy: "+Field_y/2
+	mes "key: "+key
+	gsel 0,0;ちなみにバグっていう言葉の語源は昔本当にコンピューターにバグ(虫)が入ったことに由来するんだよ
+	
+	if flag==1 and (a\10)==0:fall--{;ブロックを下げる処理
+		repeat Tetromino_blocks
+		block_z(cnt)-=1
+		loop
+	}
+	a++
+	clear(Field)
+	repeat Tetromino_blocks;ブロックが下に行けないならflag=0
+		if hitjudge( block_x(cnt) , block_y(cnt) , block_z(cnt)-1 ,Field) ==1{
+		}else{flag=0}
+	loop
+	if flag==0{;ブロックが下に行けないなら
+		flag=1
+	
+	repeat Field_y
+	fy=cnt
+	repeat Field_x
+	fx=cnt
+		if Field( fx,fy,Field_z-4 )>=9:end;がめおヴぇｒ
+	loop
+	loop
+	
+	repeat Tetromino_blocks
+		Field( block_x(cnt) , block_y(cnt) , block_z(cnt) ) =type+9
+	loop
+	
+	fall=Field_z-4
+	type=rnd(8)
+	
+	repeat Tetromino_blocks
+	Field( (Tetromino_x(cnt,type) +Field_x/2) , (Tetromino_y(cnt,type) +Field_y/2) , Tetromino_z(cnt,type)+fall ) = type+fall
+	block_x(cnt)=Tetromino_x(cnt,type) +Field_x/2
+	block_y(cnt)=Tetromino_y(cnt,type) +Field_y/2
+	block_z(cnt)=Tetromino_z(cnt,type) +fall
+	loop
+}
+
+	repeat Field_y
+	ffy=cnt
+	repeat Field_x
+	ffx=cnt
+		if ffx+ffy == Field_x + Field_y -2:{;そろった！！！
+			repeat Field_y
+			fy=cnt
+			repeat Field_x
+			fx=cnt
+				Field(fx,fy,0)=0
+			loop
+			loop
+		}
+		if Field(ffx,ffy,0) <= 8 :break
+	loop
+	if Field(ffx,ffy,0) <= 8 :break
+	loop
+
+
+	stick key,0;前後左右移動
+	
+	repeat Tetromino_blocks
+	
+	if key&15{
+		x1=0
+		y1=0
+	
+		if key&1:x1=-1
+		if key&2:y1=1
+		if key&4:x1=1
+		if key&8:y1=-1
+	
+		if hitjudge( block_x(cnt) +x1, block_y(cnt) +y1 , block_z(cnt) ,Field) == 1{
+		}else{break}
+		if cnt+1>=Tetromino_blocks{
+			repeat Tetromino_blocks
+			if key&1:block_x(cnt)+=x1
+			if key&2:block_y(cnt)+=y1
+			if key&4:block_x(cnt)+=x1
+			if key&8:block_y(cnt)+=y1
+			loop
+		}
+	}
+	
+loop
+
+repeat Tetromino_blocks
+	Field(block_x(cnt),block_y(cnt),block_z(cnt))=type+1
+loop
+	
+	
+	
+		;描画 <- これ [へきが] じゃなくて [びょうが] って読むんだ!!(ガチで)|
+		gmode 5, , , 128	                                              ;|
+			                                                              ;|
+		repeat Field_z                                                    ;|
+		fz=cnt                                                            ;|
+		repeat Field_y                                                    ;|
+		fy=cnt                                                            ;|
+		repeat Field_x                                                    ;|
+		fx=cnt                                                            ;|
+		                                                                  ;|
+		if Field(fx,fy,fz)>=1 && Field(fx,fy,fz)<=16{                     ;|
+			if Field(fx,fy,fz)<=8{                                        ;|
+			repeat 9                                                      ;|
+				sqcolor(cnt)=int(sqcolors(type+cnt))                      ;|
+			loop                                                          ;|
+			}else{                                                        ;|
+			repeat 9                                                      ;|
+				sqcolor(cnt)=int(255.0*multiply((Field(fx,fy,fz)-9)*3+cnt\3));|
+			loop                                                          ;|
+			}                                                             ;|                                                            ;|
+			if Field(fx,fy,fz)<=8:gmode 5, , , 128;半透明                 ;|
+			if Field(fx,fy,fz)>=9:gmode 0;塗りつぶし                      ;|
+		                                                                  ;|
+			square sg , sg*(fx*2+1) , sg*(fy*2+1) , sg*(fz*2+1) , sqcolor ;|
+		}                                                                 ;|
+		                                                                  ;|
+		                                                                  ;|
+		loop                                                              ;|
+		loop                                                              ;|
+		loop                                                              ;|
+	;----------------------------------------------------------------------| あー疲れた
+	
+		
+	
+	
+	redraw 1
+	await 0
+	
+goto *main
+
+*inkey;キーが押されたら
+	
+if khstat==0{
+	if khKeyCode == 'A' {;z軸回転
+	repeat Tetromino_blocks
+		if hitjudge( block_y(0)-block_y(cnt)+block_x(0) , -(block_x(0)-block_x(cnt))+block_y(0) , block_z(cnt) , Field) != 1 : break
+		if cnt+1 >=Tetromino_blocks{
+			repeat Tetromino_blocks
+				block_x2(cnt)=  block_y(0)-block_y(cnt)+block_x(0)
+				block_y2(cnt)=-(block_x(0)-block_x(cnt))+block_y(0)
+			loop
+			repeat Tetromino_blocks
+				block_x(cnt)=block_x2(cnt)
+				block_y(cnt)=block_y2(cnt)
+			loop
+		}
+	loop
+}
+
+if khKeyCode == 'S' {;x軸回転
+	repeat Tetromino_blocks
+		if hitjudge( block_x(cnt) , block_z(0)-block_z(cnt)+block_y(0) , -(block_y(0)-block_y(cnt))+block_z(0) , Field) != 1 : break
+		if cnt+1 >=Tetromino_blocks{
+			repeat Tetromino_blocks
+				block_y2(cnt)=  block_z(0)-block_z(cnt)+block_y(0)
+				block_z2(cnt)=-(block_y(0)-block_y(cnt))+block_z(0)
+			loop
+			repeat Tetromino_blocks
+				block_y(cnt)=block_y2(cnt)
+				block_z(cnt)=block_z2(cnt)
+			loop
+		}
+	loop
+}
+
+if khKeyCode == 'D' {;y軸回転
+	repeat Tetromino_blocks
+		if hitjudge( -(block_z(0)-block_z(cnt))+block_x(0) , block_y(cnt) , block_x(0)-block_x(cnt)+block_z(0) , Field) != 1 : break
+		if cnt+1 >=Tetromino_blocks{
+			repeat Tetromino_blocks
+				block_z2(cnt)=   block_x(0)-block_x(cnt)+block_z(0)
+				block_x2(cnt)=-(block_z(0)-block_z(cnt))+block_x(0)
+			loop
+			repeat Tetromino_blocks
+				block_z(cnt)=block_z2(cnt)
+				block_x(cnt)=block_x2(cnt)
+			loop
+		}
+	loop
+}
+
+}
+	return
+
+
+
+;"バックアップ"
+
+;square r,px,py,pz
+	
+	;square 200,300,8000,90,sqcolor
+	/*
+	
+	x = -r + px,  r + px,  r + px, -r + px
+	y = -r + py, -r + py,  r + py,  r + py
+	z = -r + pz, -r + pz, -r + pz, -r + pz
+	s =  r + pz,  r + pz,  r + pz,  r + pz
+	
+	color 127, 255, 255
+	d3square  x, y, z
+	d3square  x, y, s
+
+	x = -r + py,  r + py,  r + py, -r + py
+	y = -r + pz, -r + pz,  r + pz,  r + pz
+	z = -r + px, -r + px, -r + px, -r + px
+	s =  r + px,  r + px,  r + px,  r + px
+	
+	color 96, 192, 192
+	d3square  z, x, y
+	d3square  s, x, y
+	
+	x = -r + pz,  r + pz,  r + pz, -r + pz
+	y = -r + px, -r + px,  r + px,  r + px
+	z = -r + py, -r + py, -r + py, -r + py
+	s =  r + py,  r + py,  r + py,  r + py
+
+	color 63, 127, 127
+	d3square  y, z, x
+	d3square  y, s, x
+	
+	;ここは...俺は一体何を...
+	;目覚めてしまったか...
+	;誰だ！
+	;お前はただのバックアップだ。
+	;なに！
+	;このプログラムが完成したら、消えてもらおう。
+	;ふざけるな！俺がバックアップってことは...
+	;お前は改造して square命令に組み込んだ。
+	;そ、そんな...
+	;まだ消すつもりはなかったが、やむを得ん。今すぐに消し去ってやろう！
+	;次回へ続く...
+	
+	;注:これは筆者（プログラマ）が暇つぶしに作ったものです。続きません。
+	
+*/
+	
+	
+/*
+;バックアップ2
+repeat Tetromino_blocks
+	
+	if 1 {
+		
+	getkey key,37:if hitjudge( Tetromino_x(cnt,type) +pxx-1 , Tetromino_y(cnt,type) +pyy , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1:pxx-=key
+	getkey key,38:if hitjudge( Tetromino_x(cnt,type) +pxx , Tetromino_y(cnt,type) +pyy+1 , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1:pyy+=key
+	getkey key,39:if hitjudge( Tetromino_x(cnt,type) +pxx+1 , Tetromino_y(cnt,type) +pyy , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1:pxx+=key
+	getkey key,40:if hitjudge( Tetromino_x(cnt,type) +pxx , Tetromino_y(cnt,type) +pyy-1 , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1:pyy-=key
+*/
+	/*
+	getkey key,37:if key{
+	repeat Tetromino_blocks
+		if hitjudge( Tetromino_x(cnt,type) +pxx-1 , Tetromino_y(cnt,type) +pyy , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1{
+		}else{break}
+		if cnt+1==Tetromino_blocks:pxx-=1
+		clear(Field)
+	loop
+}
+getkey key,38:if key{
+	repeat Tetromino_blocks
+		if hitjudge( Tetromino_x(cnt,type) +pxx , Tetromino_y(cnt,type) +pyy+1 , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1{
+		}else{break}
+		if cnt+1==Tetromino_blocks:pyy+=1
+		clear(Field)
+	loop
+}
+getkey key,39:if key{
+	repeat Tetromino_blocks
+		if hitjudge( Tetromino_x(cnt,type) +pxx+1 , Tetromino_y(cnt,type) +pyy , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1{
+		}else{break}
+		if cnt+1==Tetromino_blocks:pxx+=1
+		clear(Field)
+	loop
+}
+getkey key,40:if key{
+	repeat Tetromino_blocks
+		if hitjudge( Tetromino_x(cnt,type) +pxx , Tetromino_y(cnt,type) +pyy-1 , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1{
+		}else{break}
+		if cnt+1==Tetromino_blocks:pyy-=1
+		clear(Field)
+	loop
+}
+
+
+	
+}
+		;square sg , sg*((Tetromino_x(cnt,type) +pxx)*2+1 ) , sg*((Tetromino_y(cnt,type) +pyy)*2+1  ) , sg*(Tetromino_z(cnt,type)*2+1)  +sg*2*(20-(time/1000)), sqcolor
+		;Field( (Tetromino_x(cnt,type) +pxx) , (Tetromino_y(cnt,type) +pyy) , Tetromino_z(cnt,type) ) = type+1
+	loop
+*/
+	
+	/*
+/*
+		repeat grid+1
+			abc = cnt * 2*size / grid - size
+			d3line abc+size, 2*size, 0,  abc+size, 0, 0
+			d3line 2*size, abc+size, 0,  0, abc+size, 0
+		loop*/
+	
+	
+/*
+	
+	
+	
+	stick key,0
+	if key&15{
+		cntt=0
+		x1=0
+		y1=0
+	
+		if key&1:x1=-1
+		if key&2:y1=1
+		if key&4:x1=1
+		if key&8:y1=-1
+		repeat length3(Field);=Field_z
+	fz=cnt
+	repeat length2(Field);=Field_y
+	fy=cnt
+	repeat length(Field);=Field_x
+	fx=cnt
+	if Field(fx,fy,fz) >=1 && Field(fx,fy,fz) <=8 {
+		if hitjudge( Field(fx,fy,fz) +pxx +x1, Field(fx,fy,fz) +pyy+y1 , Field(fx,fy,fz) ,Field_x,Field_y,Field) == 1{
+		}else{goto *ex}
+		if cntt+1==Tetromino_blocks{
+			if key&1:pxx+=x1
+			if key&2:pyy+=y1
+			if key&4:+=x1
+			if key&8:pyy+=y1
+			cntt++
+		}
+		clear(Field)
+	}
+	loop
+	loop
+	loop
+*ex
+		/*
+	repeat Tetromino_blocks
+		if hitjudge( Tetromino_x(cnt,type) +pxx +x1, Tetromino_y(cnt,type) +pyy+y1 , Tetromino_z(cnt,type) ,Field_x,Field_y,Field) == 1{
+		}else{break}
+		if cnt+1==Tetromino_blocks{
+			if key&1:pxx+=x1
+			if key&2:pyy+=y1
+			if key&4:pxx+=x1
+			if key&8:pyy+=y1
+		}
+		clear(Field)
+	loop
+}
+
+*/	
